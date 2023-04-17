@@ -76,7 +76,7 @@ public class CryptoCurrencyWatcherDAOImpl implements CryptoCurrencyWatcherDAO{
             double p;
             if(coin.getId() != user.getCoin().getId()) continue;
             double newPrice = coin.getPrice_usd();
-            if((p = Math.abs(user.getCoin().getPrice_usd() / newPrice - 1)) > 0.0001){
+            if((p = Math.abs(user.getCoin().getPrice_usd() / newPrice - 1)) > 0.01){
                 Log log = new Log("log.txt");
                 log.getLogger().setLevel(Level.WARNING);
                 log.getLogger().info("symbol: "+user.getCoin().getSymbol()+
