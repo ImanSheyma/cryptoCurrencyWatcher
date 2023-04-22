@@ -1,49 +1,56 @@
 package com.crypto.cryptoCurrencyWatcher.controller;
 
-import com.crypto.cryptoCurrencyWatcher.config.Config;
-import com.crypto.cryptoCurrencyWatcher.config.CryptoCurrency;
 import com.crypto.cryptoCurrencyWatcher.entity.Coin;
-import com.crypto.cryptoCurrencyWatcher.service.CryptoCurrencyWatcherService;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.ui.Model;
+import com.crypto.cryptoCurrencyWatcher.exceptions.CoinNotAvailableException;
+import com.crypto.cryptoCurrencyWatcher.service.CoinService;
+import com.crypto.cryptoCurrencyWatcher.service.NotifyService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.*;
-import java.net.MalformedURLException;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
+@RequiredArgsConstructor
 public class CryptoCurrencyWatcherController {
 
-    @Autowired
-    private CryptoCurrencyWatcherService service;
+    private final CoinService service;
+    private final NotifyService notifyService;
 
     @GetMapping ("/api/cryptowatcher/{id}")
-    public Coin getCoin(@PathVariable int id, Model model) throws MalformedURLException {
-        Coin coin = service.getCoinById(id);
-        return coin;
+    public ResponseEntity<Optional<Coin>> getCoin(@PathVariable("id") int id){
+        Optional<Coin> coin = service.findCoinById(id);
+        return new ResponseEntity<>(coin, HttpStatus.OK);
     }
 
-    @GetMapping("/api/cryptowatcher/")
-    public List<CryptoCurrency> getAllCoins() throws JsonProcessingException {
-        Config c = new Config();
-        return c.getCryptoCurrencies();
+    @GetMapping("/api/cryptowatcher/symbol/{symbol}")
+    public ResponseEntity<Optional<Coin>> getCoinBySymbol(@PathVariable("symbol") String symbol){
+        Optional<Coin> coin = service.findCoinBySymbol(symbol);
+        return new ResponseEntity<>(coin, HttpStatus.OK);
     }
 
-    @PutMapping (value = "/api/cryptowatcher/")
-    public List<Coin> updateCoinPrice(@RequestBody String coinsString) throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
-        List<Coin> coins = mapper.readValue(coinsString, new TypeReference<List<Coin>>() {});
-        service.updateCoinsInfo(coins);
-        return coins;
+    @GetMapping("/api/cryptowatcher/coins")
+    public ResponseEntity<List<Coin>> getAllCoins(){
+        List<Coin> coins = service.findAllCoins();
+        return new ResponseEntity<>(coins, HttpStatus.OK);
     }
 
-    @RequestMapping(value = "/api/cryptowatcher/notify")
-    public String logPriceChange(@RequestParam(value="name") String name,
-                                 @RequestParam(value="symbol") String symbol){
-        return service.logPriceChange(name, symbol);
+    @PostMapping("/notify")
+    public ResponseEntity<String> notify(@RequestParam("name") String name, @RequestParam("symbol") String symbol) throws CoinNotAvailableException {
+        String msg = notifyService.register(name, symbol);
+        return ResponseEntity.ok(msg);
     }
+
+    @ExceptionHandler(CoinNotAvailableException.class)
+    public ResponseEntity<String> handleCoinNotAvailableException(CoinNotAvailableException ex){
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<String> handleException(Exception ex){
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ex.getMessage());
+    }
+
 }
